@@ -1,82 +1,151 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 // Desafio Batalha Naval - MateCheck
 // Este código inicial serve como base para o desenvolvimento do sistema de Batalha Naval.
 // Siga os comentários para implementar cada parte do desafio.
 
 
-int main() {
-    int tabuleiro[10][10];  // matriz 10x10 que representa o mar (0 = água, 3 = navio)
-    int i, j;
+// inicializa tabuleiro 10x10
+void inicializarTabuleiro(int tab[10][10]) {
+    for (int r = 0; r < 10; r++)
+        for (int c = 0; c < 10; c++)
+            tab[r][c] = 0;
+}
 
-    // vetores que representam os navios (cada um com 3 posições)
-    int navio1[3] = {3, 3, 3}; // navio horizontal
-    int navio2[3] = {3, 3, 3}; // navio vertical
-    int navio3[3] = {3, 3, 3}; // navio diagonal principal (↘)
-    int navio4[3] = {3, 3, 3}; // navio diagonal secundária (↙)
+// posiciona 4 navios fixos de tamanho 3 (dois retos e dois diagonais)
+void posicionarNavios(int tab[10][10]) {
+    int i;
 
-    // coordenadas iniciais dos navios
-    int linhaNavio1 = 2;  // linha inicial do navio 1 (horizontal)
-    int colunaNavio1 = 4; // coluna inicial do navio 1 (horizontal)
-
-    int linhaNavio2 = 5;  // linha inicial do navio 2 (vertical)
-    int colunaNavio2 = 7; // coluna inicial do navio 2 (vertical)
-
-    int linhaNavio3 = 1;  // linha inicial do navio 3 (diagonal ↘)
-    int colunaNavio3 = 1; // coluna inicial do navio 3 (diagonal ↘)
-
-    int linhaNavio4 = 2;  // linha inicial do navio 4 (diagonal ↙)
-    int colunaNavio4 = 8; // coluna inicial do navio 4 (diagonal ↙)
-
-    // define todas as posições do tabuleiro como água (0)
-    for (i = 0; i < 10; i++) {
-        for (j = 0; j < 10; j++) {
-            tabuleiro[i][j] = 0;
-        }
+    // navio 1
+    int ln1 = 2, cn1 = 1;
+    for (i = 0; i < 3; i++) {
+        int c = cn1 + i;
+        if (ln1 >= 0 && ln1 < 10 && c >= 0 && c < 10)
+            tab[ln1][c] = 3;
     }
 
-    // posiciona o primeiro navio (horizontal)
+    // navio 2
+    int ln2 = 5, cn2 = 7;
     for (i = 0; i < 3; i++) {
-        if (colunaNavio1 + i < 10) {
-            tabuleiro[linhaNavio1][colunaNavio1 + i] = navio1[i];
-        }
+        int r = ln2 + i;
+        if (r >= 0 && r < 10 && cn2 >= 0 && cn2 < 10)
+            tab[r][cn2] = 3;
     }
 
-    // posiciona o segundo navio (vertical)
+    // navio 3
+    int ln3 = 0, cn3 = 0;
     for (i = 0; i < 3; i++) {
-        if (linhaNavio2 + i < 10) {
-            if (tabuleiro[linhaNavio2 + i][colunaNavio2] == 0) {
-                tabuleiro[linhaNavio2 + i][colunaNavio2] = navio2[i];
+        int r = ln3 + i;
+        int c = cn3 + i;
+        if (r >= 0 && r < 10 && c >= 0 && c < 10)
+            tab[r][c] = 3;
+    }
+
+    // navio 4
+    int ln4 = 2, cn4 = 9;
+    for (i = 0; i < 3; i++) {
+        int r = ln4 + i;
+        int c = cn4 - i;
+        if (r >= 0 && r < 10 && c >= 0 && c < 10)
+            tab[r][c] = 3;
+    }
+}
+
+// cria dinamicamente a matriz 5x5 do "cone" (apex no topo, expande pra baixo)
+// regra usada: em linha i (0..4) ativa colunas j em que abs(j-centro) <= i
+void criarMatrizCone(int mat[5][5]) {
+    int tamanho = 5;
+    int centro = tamanho / 2; // 2
+    for (int i = 0; i < tamanho; i++) {
+        for (int j = 0; j < tamanho; j++) {
+            if (abs(j - centro) <= i) mat[i][j] = 1;
+            else mat[i][j] = 0;
+        }
+    }
+}
+
+// Cria dinamicamente a matriz 5x5 da "cruz" (linha e coluna central = 1)
+void criarMatrizCruz(int mat[5][5]) {
+    int tamanho = 5;
+    int centro = tamanho / 2; // 2
+    for (int i = 0; i < tamanho; i++) {
+        for (int j = 0; j < tamanho; j++) {
+            if (i == centro || j == centro) mat[i][j] = 1;
+            else mat[i][j] = 0;
+        }
+    }
+}
+
+// cria dinamicamente a matriz 5x5 do "octaedro" visto frontal (losango/diamante)
+// regra: abs(i-centro) + abs(j-centro) <= centro
+void criarMatrizOctaedro(int mat[5][5]) {
+    int tamanho = 5;
+    int centro = tamanho / 2; // 2
+    for (int i = 0; i < tamanho; i++) {
+        for (int j = 0; j < tamanho; j++) {
+            if (abs(i - centro) + abs(j - centro) <= centro) mat[i][j] = 1;
+            else mat[i][j] = 0;
+        }
+    }
+}
+
+// aplica (sobrepõe) a matriz de habilidade ao tabuleiro, centrando-a em (origemR, origemC).
+// se a célula de habilidade == 1 e estiver dentro do tabuleiro, marca tab[r][c] = 5 (área afetada).
+void aplicarHabilidade(int tab[10][10], int hab[5][5], int origemR, int origemC) {
+    int tamanho = 5;
+    int centro = tamanho / 2; // 2
+    for (int i = 0; i < tamanho; i++) {
+        for (int j = 0; j < tamanho; j++) {
+            if (hab[i][j] == 1) { // condicional que decide área afetada
+                int r = origemR - centro + i;
+                int c = origemC - centro + j;
+                if (r >= 0 && r < 10 && c >= 0 && c < 10) { // verifica limites
+                    tab[r][c] = 5; // marca como área afetada (sobrescreve navio se houver)
+                }
             }
         }
     }
+}
 
-    // posiciona o terceiro navio (diagonal principal ↘)
-    for (i = 0; i < 3; i++) {
-        if (linhaNavio3 + i < 10 && colunaNavio3 + i < 10) {
-            if (tabuleiro[linhaNavio3 + i][colunaNavio3 + i] == 0) {
-                tabuleiro[linhaNavio3 + i][colunaNavio3 + i] = navio3[i];
-            }
-        }
-    }
-
-    // posiciona o quarto navio (diagonal secundária ↙)
-    for (i = 0; i < 3; i++) {
-        if (linhaNavio4 + i < 10 && colunaNavio4 - i >= 0) {
-            if (tabuleiro[linhaNavio4 + i][colunaNavio4 - i] == 0) {
-                tabuleiro[linhaNavio4 + i][colunaNavio4 - i] = navio4[i];
-            }
-        }
-    }
-
-    // mostra o tabuleiro no console
+// exibe o tabuleiro
+void exibirTabuleiro(int tabuleiro[10][10]) {
     printf(" Tabuleiro:\n\n");
-    for (i = 0; i < 10; i++) {
-        for (j = 0; j < 10; j++) {
-            printf("%d ", tabuleiro[i][j]); // imprime cada célula com espaço
+    for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 10; j++) {
+            printf("%d ", tabuleiro[i][j]);
         }
-        printf("\n"); // quebra de linha a cada linha da matriz
+        printf("\n");
     }
+}
+
+int main() {
+    int tabuleiro[10][10];
+    int cone[5][5], cruz[5][5], octaedro[5][5];
+
+    // inicializa o tabuleiro
+    inicializarTabuleiro(tabuleiro);
+
+    // posiciona os navios
+    posicionarNavios(tabuleiro);
+
+    // cria as matrizes de habilidade
+    criarMatrizCone(cone);
+    criarMatrizCruz(cruz);
+    criarMatrizOctaedro(octaedro);
+
+    // Define pontos de origem (centro) no tabuleiro para cada habilidade
+    int origConeR = 1, origConeC = 3;   // cone centrado em (1,3)
+    int origCruzR = 6, origCruzC = 2;   // cruz centrada em (6,2)
+    int origOctR  = 4, origOctC  = 7;   // octaedro centrado em (4,7)
+
+    //  aplica habilidades (sobrepõe área marcada com 5)
+    aplicarHabilidade(tabuleiro, cone, origConeR, origConeC);
+    aplicarHabilidade(tabuleiro, cruz, origCruzR, origCruzC);
+    aplicarHabilidade(tabuleiro, octaedro, origOctR, origOctC);
+
+    // exibe tabuleiro final
+    exibirTabuleiro(tabuleiro);
 
     return 0;
-}
+};
